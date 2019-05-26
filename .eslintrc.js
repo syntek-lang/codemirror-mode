@@ -15,6 +15,9 @@ module.exports = {
     'eslint-comments',
   ],
   rules: {
+    'no-param-reassign': 'off', // fine for working with CodeMirror
+    'no-use-before-define': 'off', // fine for working with CodeMirror
+
     'no-console': 'off',
     'class-methods-use-this': 'off',
     'require-await': 'error',

@@ -1,3 +1,3 @@
 # codemirror-mode-syntek
 
-> :memo: Codemirror mode for the Syntek language
+> :memo: CodeMirror mode for the Syntek language
