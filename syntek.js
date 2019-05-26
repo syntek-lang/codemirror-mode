@@ -12,9 +12,11 @@ CodeMirror.defineMode('syntek', (config) => {
   const STRING = /^'(?:[^'\\]|\\.)*'/;
   const OPERATORS = ['=', '+', '-', '*', '/', '%', '^'];
   const WORD_OPERATORS = ['is greater than', 'is less than', 'is not', 'is'];
-  const PUNCTUATION = ['(', ')', '[', ']', ',', '.'];
+  const PUNCTUATION = ['(', ')', '[', ']', '{', '}', ',', '.'];
   const KEYWORDS = [
-    'class', 'function',
+    'true', 'false',
+    'class', 'static',
+    'function',
     'continue', 'break', 'return',
     'while',
     'repeat', 'times',
@@ -23,7 +25,6 @@ CodeMirror.defineMode('syntek', (config) => {
     'import', 'as',
   ];
   const BUILTINS = [
-    'true', 'false',
     'number', 'string', 'boolean', 'object', 'any',
     'print',
   ];
