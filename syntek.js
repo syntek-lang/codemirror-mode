@@ -14,7 +14,6 @@ CodeMirror.defineMode('syntek', (config) => {
   const WORD_OPERATORS = ['is greater than', 'is less than', 'is not', 'is'];
   const PUNCTUATION = ['(', ')', '[', ']', '{', '}', ',', '.'];
   const KEYWORDS = [
-    'true', 'false',
     'class', 'static',
     'function',
     'continue', 'break', 'return',
@@ -24,10 +23,9 @@ CodeMirror.defineMode('syntek', (config) => {
     'else if', 'else', 'if',
     'import', 'as',
   ];
-  const BUILTINS = [
-    'number', 'string', 'boolean', 'object', 'any',
-    'print',
-  ];
+  const BUILTINS = ['print'];
+  const TYPES = ['number', 'string', 'boolean', 'object', 'any'];
+  const ATOMS = ['true', 'false'];
   const THIS = 'this';
   const IDENTIFIER = /^[a-zA-Z_]\w*/;
 
@@ -90,6 +88,20 @@ CodeMirror.defineMode('syntek', (config) => {
     for (const builtin of BUILTINS) {
       if (stream.match(builtin)) {
         return 'builtin';
+      }
+    }
+
+    // Handle types
+    for (const type of TYPES) {
+      if (stream.match(type)) {
+        return 'type';
+      }
+    }
+
+    // Handle atoms
+    for (const atom of ATOMS) {
+      if (stream.match(atom)) {
+        return 'atom';
       }
     }
 
