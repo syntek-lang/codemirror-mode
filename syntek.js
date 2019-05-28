@@ -3,6 +3,7 @@
 CodeMirror.defineMode('syntek', (config) => {
   const ERROR_CLASS = 'error';
 
+  // Tokens
   const COMMENT = /^#.*/;
   const NUMBER = /^(?:0|-?[1-9]\d*(?:\.\d+)?)/;
   const STRING = /^'(?:[^'\\]|\\.)*'/;
@@ -24,6 +25,10 @@ CodeMirror.defineMode('syntek', (config) => {
   const ATOMS = ['true', 'false'];
   const THIS = 'this';
   const IDENTIFIER = /^[a-zA-Z_]\w*/;
+
+  // Keywords that handle indentation
+  const INDENT_KEYWORDS = ['if', 'else', 'else if', 'for', 'while', 'repeat'];
+  const DEDENT_KEYWORDS = ['return', 'break', 'continue'];
 
   function dedent(stream, state) {
     const indent = stream.indentation();
@@ -62,8 +67,13 @@ CodeMirror.defineMode('syntek', (config) => {
     const style = state.tokenize(stream, state);
     const current = stream.current();
 
-    // On return/break/continue the indentation should go back one step
-    if (current === 'return' || current === 'break' || current === 'continue') {
+    // Add an indent
+    if (INDENT_KEYWORDS.includes(current)) {
+      pushTopScope(state);
+    }
+
+    // Remove an indent
+    if (DEDENT_KEYWORDS.includes(current)) {
       state.dedent += 1;
     }
 
@@ -218,10 +228,13 @@ CodeMirror.defineMode('syntek', (config) => {
     startState(basecolumn) {
       return {
         tokenize: tokenBase,
+
         indent: basecolumn || 0,
         dedent: 0,
+
         lastToken: null,
         error: false,
+
         scopes: [{ offset: basecolumn || 0, type: null, align: null }],
         lastScope() {
           return this.scopes[this.scopes.length - 1];
