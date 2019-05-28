@@ -1,10 +1,6 @@
 /* global CodeMirror */
 
-// import CodeMirror from 'codemirror';
-
 CodeMirror.defineMode('syntek', (config) => {
-  console.log(config);
-
   const ERROR_CLASS = 'error';
 
   const COMMENT = /^#.*/;
@@ -29,13 +25,75 @@ CodeMirror.defineMode('syntek', (config) => {
   const THIS = 'this';
   const IDENTIFIER = /^[a-zA-Z_]\w*/;
 
-  function tokenBase(stream, state) {
-    if (stream.sol()) {
-      // Set the indentation level
-      state.indent = stream.indentation();
+  function dedent(stream, state) {
+    const indent = stream.indentation();
+    while (state.scopes.length > 1 && state.lastScope().offset > indent) {
+      if (state.lastScope().type) {
+        return true;
+      }
+
+      state.scopes.pop();
+    }
+    return state.lastScope().offset !== indent;
+  }
+
+  function pushTopScope(state) {
+    while (state.lastScope().type) {
+      state.scopes.pop();
     }
 
-    return tokenBaseInner(stream, state);
+    state.scopes.push({
+      offset: state.lastScope().offset + config.tabSize,
+      type: null,
+      align: null,
+    });
+  }
+
+  function pushScope(stream, state, type) {
+    const align = stream.match(/^([\s[{(]|#.*)*$/, false) ? null : stream.column() + 1;
+    state.scopes.push({
+      offset: state.indent + config.tabSize,
+      type,
+      align,
+    });
+  }
+
+  function tokenLexer(stream, state) {
+    const style = state.tokenize(stream, state);
+    const current = stream.current();
+
+    // On return/break/continue the indentation should go back one step
+    if (current === 'return' || current === 'break' || current === 'continue') {
+      state.dedent += 1;
+    }
+
+    // Enter a new scope on [, ( or {
+    if (current.length === 1 && style !== 'string' && style !== 'comment') {
+      let index = '[({'.indexOf(current);
+      if (index !== -1) {
+        pushScope(stream, state, '])}'.slice(index, index + 1));
+      }
+
+      index = '])}'.indexOf(current);
+      if (index !== -1) {
+        if (state.lastScope().type === current) {
+          state.indent = state.scopes.pop().offset - config.tabSize;
+        } else {
+          return ERROR_CLASS;
+        }
+      }
+    }
+
+    // Dedent where needed
+    if (state.dedent > 0 && stream.eol() && !state.lastScope().type) {
+      if (state.scopes.length > 1) {
+        state.scopes.pop();
+      }
+
+      state.dedent -= 1;
+    }
+
+    return style;
   }
 
   function tokenBaseInner(stream, state) {
@@ -124,12 +182,36 @@ CodeMirror.defineMode('syntek', (config) => {
     return ERROR_CLASS;
   }
 
-  function tokenLexer(stream, state) {
+  function tokenBase(stream, state) {
     if (stream.sol()) {
-      state.beginningOfLine = true;
+      state.indent = stream.indentation();
+
+      if (!state.lastScope().type) {
+        const scopeOffset = state.lastScope().offset;
+
+        if (stream.eatSpace()) {
+          const lineOffset = stream.indentation();
+
+          if (lineOffset > scopeOffset) {
+            pushTopScope(state);
+          } else if (lineOffset < scopeOffset && dedent(stream, state) && stream.peek() !== '#') {
+            state.error = true;
+          }
+
+          return null;
+        }
+
+        let style = tokenBaseInner(stream, state);
+
+        if (scopeOffset > 0 && dedent(stream, state)) {
+          style += ` ${ERROR_CLASS}`;
+        }
+
+        return style;
+      }
     }
 
-    return state.tokenize(stream, state);
+    return tokenBaseInner(stream, state);
   }
 
   return {
@@ -137,13 +219,23 @@ CodeMirror.defineMode('syntek', (config) => {
       return {
         tokenize: tokenBase,
         indent: basecolumn || 0,
-        lastToken: null,
         dedent: 0,
+        lastToken: null,
+        error: false,
+        scopes: [{ offset: basecolumn || 0, type: null, align: null }],
+        lastScope() {
+          return this.scopes[this.scopes.length - 1];
+        },
       };
     },
+
     token(stream, state) {
+      const error = state.error;
+      if (error) {
+        state.error = false;
+      }
+
       const style = tokenLexer(stream, state);
-      // console.log(stream, state, style);
 
       if (style && style !== 'comment') {
         if (style === 'keyword' || style === 'punctuation') {
@@ -153,8 +245,23 @@ CodeMirror.defineMode('syntek', (config) => {
         }
       }
 
-      return style;
+      return error ? `${style} ${ERROR_CLASS}` : style;
     },
+
+    indent(state, textAfter) {
+      const scope = state.lastScope();
+      const closing = scope.type === textAfter.charAt(0);
+
+      if (scope.align === null) {
+        return scope.offset - (closing ? config.tabSize : 0);
+      }
+
+      return scope.align - (closing ? 1 : 0);
+    },
+
+    electricInput: /^\s*[}\])]$/,
+    lineComment: '#',
+    fold: 'indent',
   };
 });
 
