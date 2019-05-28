@@ -18,9 +18,6 @@
     "url": "https://github.com/syntek-lang/codemirror-mode-syntek/issues"
   },
   "homepage": "https://github.com/syntek-lang/codemirror-mode-syntek#readme",
-  "dependencies": {
-    "codemirror": "^5.47.0"
-  },
   "devDependencies": {
     "@syntek/eslint-config-syntek": "^1.0.0",
     "eslint": "^5.16.0",
@@ -28,5 +25,8 @@
     "eslint-plugin-eslint-comments": "^3.1.1",
     "eslint-plugin-import": "^2.17.3",
     "eslint-plugin-jsdoc": "^7.0.2"
+  },
+  "peerDependencies": {
+    "codemirror": "^5.47.0"
   }
 }
