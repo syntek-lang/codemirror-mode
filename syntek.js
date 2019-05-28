@@ -30,28 +30,13 @@ CodeMirror.defineMode('syntek', (config) => {
   const INDENT_KEYWORDS = ['if', 'else', 'else if', 'for', 'while', 'repeat', 'class', 'function'];
   const DEDENT_KEYWORDS = ['return', 'break', 'continue'];
 
-  function pushScope(state, type) {
-    state.scopes.push({
-      offset: state.indent + config.tabSize,
-      type,
-    });
-  }
-
-  function popScope(state) {
-    const offset = state.lastScope().offset;
-
-    while (state.scopes.length > 1 && state.lastScope().offset === offset) {
-      state.scopes.pop();
-    }
-  }
-
   function tokenLexer(stream, state) {
     const style = state.tokenize(stream, state);
     const current = stream.current();
 
     // Add an indent
     if (INDENT_KEYWORDS.includes(current)) {
-      pushScope(state, 'block');
+      state.pushScope('block');
     }
 
     // Remove an indent
@@ -63,14 +48,14 @@ CodeMirror.defineMode('syntek', (config) => {
     if (current.length === 1 && !['string', 'comment'].includes(style)) {
       let index = '[({'.indexOf(current);
       if (index !== -1) {
-        pushScope(state, '])}'[index]);
+        state.pushScope('])}'[index]);
       }
 
       index = '])}'.indexOf(current);
       if (index !== -1) {
         if (state.findLastOfType(current)) {
           state.indent = state.findLastOfType(current).offset - config.tabSize;
-          state.scopes.pop();
+          state.popLastOfType(current);
         } else {
           return ERROR_CLASS;
         }
@@ -79,7 +64,7 @@ CodeMirror.defineMode('syntek', (config) => {
 
     // Dedent where needed
     if (state.dedent > 0 && stream.eol()) {
-      popScope(state);
+      state.popScope();
       state.dedent -= 1;
     }
 
@@ -183,7 +168,7 @@ CodeMirror.defineMode('syntek', (config) => {
           const lineOffset = stream.indentation();
 
           if (lineOffset > scopeOffset) {
-            pushScope(state, 'block');
+            state.pushScope('block');
           } else if (lineOffset % config.tabSize !== 0 && stream.peek() !== '#') {
             state.error = true;
           }
@@ -214,6 +199,35 @@ CodeMirror.defineMode('syntek', (config) => {
         findLastOfType(type) {
           return this.scopes.filter(scope => scope.type === type).pop();
         },
+        popLastOfType(type) {
+          for (let i = this.scopes.length - 1; i >= 0; i -= 1) {
+            if (this.scopes[i].type === type) {
+              return this.scopes.splice(i).pop();
+            }
+          }
+
+          return null;
+        },
+        popScope() {
+          const offset = this.lastScope().offset;
+
+          while (this.scopes.length > 1 && this.lastScope().offset === offset) {
+            this.scopes.pop();
+          }
+        },
+        pushScope(type) {
+          const newScope = {
+            offset: this.indent + config.tabSize,
+            type,
+          };
+
+          const scope = this.lastScope();
+          if (scope.offset === newScope.offset && scope.type === newScope.type) {
+            return;
+          }
+
+          this.scopes.push(newScope);
+        },
       };
     },
 
@@ -225,7 +239,7 @@ CodeMirror.defineMode('syntek', (config) => {
 
       const style = tokenLexer(stream, state);
 
-      if (style !== 'comment') {
+      if (style && style !== 'comment') {
         if (style === 'keyword' || style === 'punctuation') {
           state.lastToken = stream.current();
         } else {
