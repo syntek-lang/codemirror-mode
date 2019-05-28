@@ -27,40 +27,22 @@ CodeMirror.defineMode('syntek', (config) => {
   const IDENTIFIER = /^[a-zA-Z_]\w*/;
 
   // Keywords that handle indentation
-  const INDENT_KEYWORDS = ['if', 'else', 'else if', 'for', 'while', 'repeat'];
+  const INDENT_KEYWORDS = ['if', 'else', 'else if', 'for', 'while', 'repeat', 'class', 'function'];
   const DEDENT_KEYWORDS = ['return', 'break', 'continue'];
 
-  function dedent(stream, state) {
-    const indent = stream.indentation();
-    while (state.scopes.length > 1 && state.lastScope().offset > indent) {
-      if (state.lastScope().type) {
-        return true;
-      }
-
-      state.scopes.pop();
-    }
-    return state.lastScope().offset !== indent;
-  }
-
-  function pushTopScope(state) {
-    while (state.lastScope().type) {
-      state.scopes.pop();
-    }
-
-    state.scopes.push({
-      offset: state.lastScope().offset + config.tabSize,
-      type: null,
-      align: null,
-    });
-  }
-
-  function pushScope(stream, state, type) {
-    const align = stream.match(/^([\s[{(]|#.*)*$/, false) ? null : stream.column() + 1;
+  function pushScope(state, type) {
     state.scopes.push({
       offset: state.indent + config.tabSize,
       type,
-      align,
     });
+  }
+
+  function popScope(state) {
+    const offset = state.lastScope().offset;
+
+    while (state.scopes.length > 1 && state.lastScope().offset === offset) {
+      state.scopes.pop();
+    }
   }
 
   function tokenLexer(stream, state) {
@@ -69,7 +51,7 @@ CodeMirror.defineMode('syntek', (config) => {
 
     // Add an indent
     if (INDENT_KEYWORDS.includes(current)) {
-      pushTopScope(state);
+      pushScope(state, 'block');
     }
 
     // Remove an indent
@@ -77,17 +59,18 @@ CodeMirror.defineMode('syntek', (config) => {
       state.dedent += 1;
     }
 
-    // Enter a new scope on [, ( or {
-    if (current.length === 1 && style !== 'string' && style !== 'comment') {
+    // Enter or exit array, parentheses and object scope
+    if (current.length === 1 && !['string', 'comment'].includes(style)) {
       let index = '[({'.indexOf(current);
       if (index !== -1) {
-        pushScope(stream, state, '])}'.slice(index, index + 1));
+        pushScope(state, '])}'[index]);
       }
 
       index = '])}'.indexOf(current);
       if (index !== -1) {
-        if (state.lastScope().type === current) {
-          state.indent = state.scopes.pop().offset - config.tabSize;
+        if (state.findLastOfType(current)) {
+          state.indent = state.findLastOfType(current).offset - config.tabSize;
+          state.scopes.pop();
         } else {
           return ERROR_CLASS;
         }
@@ -95,11 +78,8 @@ CodeMirror.defineMode('syntek', (config) => {
     }
 
     // Dedent where needed
-    if (state.dedent > 0 && stream.eol() && !state.lastScope().type) {
-      if (state.scopes.length > 1) {
-        state.scopes.pop();
-      }
-
+    if (state.dedent > 0 && stream.eol()) {
+      popScope(state);
       state.dedent -= 1;
     }
 
@@ -196,28 +176,20 @@ CodeMirror.defineMode('syntek', (config) => {
     if (stream.sol()) {
       state.indent = stream.indentation();
 
-      if (!state.lastScope().type) {
+      if (state.lastScope().type === 'block') {
         const scopeOffset = state.lastScope().offset;
 
         if (stream.eatSpace()) {
           const lineOffset = stream.indentation();
 
           if (lineOffset > scopeOffset) {
-            pushTopScope(state);
-          } else if (lineOffset < scopeOffset && dedent(stream, state) && stream.peek() !== '#') {
+            pushScope(state, 'block');
+          } else if (lineOffset % config.tabSize !== 0 && stream.peek() !== '#') {
             state.error = true;
           }
 
           return null;
         }
-
-        let style = tokenBaseInner(stream, state);
-
-        if (scopeOffset > 0 && dedent(stream, state)) {
-          style += ` ${ERROR_CLASS}`;
-        }
-
-        return style;
       }
     }
 
@@ -235,9 +207,12 @@ CodeMirror.defineMode('syntek', (config) => {
         lastToken: null,
         error: false,
 
-        scopes: [{ offset: basecolumn || 0, type: null, align: null }],
+        scopes: [{ offset: basecolumn || 0, type: 'block' }],
         lastScope() {
           return this.scopes[this.scopes.length - 1];
+        },
+        findLastOfType(type) {
+          return this.scopes.filter(scope => scope.type === type).pop();
         },
       };
     },
@@ -250,7 +225,7 @@ CodeMirror.defineMode('syntek', (config) => {
 
       const style = tokenLexer(stream, state);
 
-      if (style && style !== 'comment') {
+      if (style !== 'comment') {
         if (style === 'keyword' || style === 'punctuation') {
           state.lastToken = stream.current();
         } else {
@@ -262,14 +237,12 @@ CodeMirror.defineMode('syntek', (config) => {
     },
 
     indent(state, textAfter) {
-      const scope = state.lastScope();
-      const closing = scope.type === textAfter.charAt(0);
+      const type = textAfter.charAt(0);
 
-      if (scope.align === null) {
-        return scope.offset - (closing ? config.tabSize : 0);
-      }
+      const scope = state.findLastOfType(type) || state.lastScope();
+      const closing = scope.type === type;
 
-      return scope.align - (closing ? 1 : 0);
+      return scope.offset - (closing ? config.tabSize : 0);
     },
 
     electricInput: /^\s*[}\])]$/,
