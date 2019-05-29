@@ -7,15 +7,29 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>CodeMirror Syntek</title>
 
-  <link rel="stylesheet" href="node_modules/codemirror/lib/codemirror.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.47.0/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.47.0/theme/monokai.min.css">
 
-  <script src="node_modules/codemirror/lib/codemirror.js"></script>
-  <script src="syntek.js"></script>
+  <style>
+    body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .CodeMirror {
+      width: 100%;
+      height: 100%;
+    }
+
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.47.0/codemirror.min.js"></script>
+  <script src="./syntek.js"></script>
 </head>
 
 <body>
-  <div>
-    <textarea id="code" name="code"># This is the direction the snake is going
+  <textarea id="code" name="code"># Snake
 direction = 1
 
 function arrowUp()
@@ -30,7 +44,6 @@ function arrowDown()
 function arrowLeft()
 	direction = 3
 
-# Move the snake around
 function loop()
 	if direction is 0
 		moveUp()
@@ -39,16 +52,27 @@ function loop()
 	else if direction is 2
 		moveDown()
 	else if direction is 3
-		moveLeft()</textarea>
-  </div>
+		moveLeft()
+
+# Calculator
+function multiply(a, b)
+	sum = 0
+	repeat b times
+		sum = sum + a
+	return sum
+
+function pow(base, exponent)
+	sum = base
+	repeat exponent - 1 times
+		sum = multiply(sum, base)
+	return sum</textarea>
 
   <script>
     const editor = CodeMirror.fromTextArea(document.getElementById('code'), {
+      theme: 'monokai',
       mode: 'syntek',
       indentWithTabs: true
     });
-
-    editor.setSize(500, 800);
 
   </script>
 </body>
