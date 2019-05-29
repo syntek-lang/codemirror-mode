@@ -30,48 +30,7 @@ CodeMirror.defineMode('syntek', (config) => {
   const INDENT_KEYWORDS = ['if', 'else', 'else if', 'for', 'while', 'repeat', 'class', 'function'];
   const DEDENT_KEYWORDS = ['return', 'break', 'continue'];
 
-  function tokenLexer(stream, state) {
-    const style = state.tokenize(stream, state);
-    const current = stream.current();
-
-    // Add an indent
-    if (INDENT_KEYWORDS.includes(current)) {
-      state.pushScope('block');
-    }
-
-    // Remove an indent
-    if (DEDENT_KEYWORDS.includes(current)) {
-      state.dedent += 1;
-    }
-
-    // Enter or exit array, parentheses and object scope
-    if (current.length === 1 && !['string', 'comment'].includes(style)) {
-      let index = '[({'.indexOf(current);
-      if (index !== -1) {
-        state.pushScope('])}'[index]);
-      }
-
-      index = '])}'.indexOf(current);
-      if (index !== -1) {
-        if (state.findLastOfType(current)) {
-          state.indent = state.findLastOfType(current).offset - config.tabSize;
-          state.popLastOfType(current);
-        } else {
-          return ERROR_CLASS;
-        }
-      }
-    }
-
-    // Dedent where needed
-    if (state.dedent > 0 && stream.eol()) {
-      state.popScope();
-      state.dedent -= 1;
-    }
-
-    return style;
-  }
-
-  function tokenBaseInner(stream, state) {
+  function findStyle(stream, state) {
     if (stream.eatSpace()) {
       return null;
     }
@@ -157,28 +116,39 @@ CodeMirror.defineMode('syntek', (config) => {
     return ERROR_CLASS;
   }
 
+  function tokenLexer(stream, state) {
+    const style = state.tokenize(stream, state);
+    const current = stream.current();
+
+    if (INDENT_KEYWORDS.includes(current)) {
+      state.pushScope('block');
+    }
+
+    if (DEDENT_KEYWORDS.includes(current)) {
+      state.popScope();
+    }
+
+    if (current === '{') {
+      state.pushScope('}');
+    }
+
+    if (current === '}') {
+      state.popScope();
+    }
+
+    return style;
+  }
+
   function tokenBase(stream, state) {
     if (stream.sol()) {
-      state.indent = stream.indentation();
+      const topScope = state.topScope();
 
-      if (state.lastScope().type === 'block') {
-        const scopeOffset = state.lastScope().offset;
-
-        if (stream.eatSpace()) {
-          const lineOffset = stream.indentation();
-
-          if (lineOffset > scopeOffset) {
-            state.pushScope('block');
-          } else if (lineOffset % config.tabSize !== 0 && stream.peek() !== '#') {
-            state.error = true;
-          }
-
-          return null;
-        }
+      if (topScope.type === 'block' && topScope.offset > 0) {
+        state.dedent(stream);
       }
     }
 
-    return tokenBaseInner(stream, state);
+    return findStyle(stream, state);
   }
 
   return {
@@ -186,47 +156,42 @@ CodeMirror.defineMode('syntek', (config) => {
       return {
         tokenize: tokenBase,
 
-        indent: basecolumn || 0,
-        dedent: 0,
-
         lastToken: null,
         error: false,
 
         scopes: [{ offset: basecolumn || 0, type: 'block' }],
-        lastScope() {
+        topScope() {
           return this.scopes[this.scopes.length - 1];
         },
-        findLastOfType(type) {
-          return this.scopes.filter(scope => scope.type === type).pop();
+        pushScope(type) {
+          return this.scopes.push({ offset: this.topScope().offset + config.tabSize, type });
         },
-        popLastOfType(type) {
-          for (let i = this.scopes.length - 1; i >= 0; i -= 1) {
-            if (this.scopes[i].type === type) {
-              return this.scopes.splice(i).pop();
-            }
+        popScope() {
+          if (this.scopes.length > 1) {
+            return this.scopes.pop();
           }
 
           return null;
         },
-        popScope() {
-          const offset = this.lastScope().offset;
+        dedent(stream) {
+          const indent = stream.indentation();
 
-          while (this.scopes.length > 1 && this.lastScope().offset === offset) {
-            this.scopes.pop();
+          while (this.scopes.length > 1 && this.topScope().offset > indent) {
+            if (this.topScope().type === 'block') {
+              this.popScope();
+            } else {
+              return;
+            }
           }
         },
-        pushScope(type) {
-          const newScope = {
-            offset: this.indent + config.tabSize,
-            type,
-          };
-
-          const scope = this.lastScope();
-          if (scope.offset === newScope.offset && scope.type === newScope.type) {
-            return;
+        topScopeOfType(type) {
+          for (let i = this.scopes.length - 1; i >= 0; i -= 1) {
+            if (this.scopes[i].type === type) {
+              return this.scopes[i];
+            }
           }
 
-          this.scopes.push(newScope);
+          return null;
         },
       };
     },
@@ -251,10 +216,8 @@ CodeMirror.defineMode('syntek', (config) => {
     },
 
     indent(state, textAfter) {
-      const type = textAfter.charAt(0);
-
-      const scope = state.findLastOfType(type) || state.lastScope();
-      const closing = scope.type === type;
+      const scope = state.topScopeOfType(textAfter) || state.topScope();
+      const closing = scope.type === textAfter;
 
       return scope.offset - (closing ? config.tabSize : 0);
     },
