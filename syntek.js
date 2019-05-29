@@ -3,14 +3,19 @@
 CodeMirror.defineMode('syntek', (config) => {
   const ERROR_CLASS = 'error';
 
+  function wordsToRegex(words) {
+    return new RegExp(`^((${words.join(')|(')}))\\b`);
+  }
+
   // Tokens
   const COMMENT = /^#.*/;
   const NUMBER = /^(?:0|-?[1-9]\d*(?:\.\d+)?)/;
   const STRING = /^'(?:[^'\\]|\\.)*'/;
+
   const OPERATORS = ['=', '+', '-', '*', '/', '%', '^'];
-  const WORD_OPERATORS = ['is greater than', 'is less than', 'is not', 'is'];
   const PUNCTUATION = ['(', ')', '[', ']', '{', '}', ',', '.'];
-  const KEYWORDS = [
+
+  const KEYWORDS = wordsToRegex([
     'class', 'static',
     'function',
     'continue', 'break', 'return',
@@ -19,11 +24,13 @@ CodeMirror.defineMode('syntek', (config) => {
     'for', 'in',
     'else if', 'else', 'if',
     'import', 'as',
-  ];
-  const BUILTINS = ['print'];
-  const TYPES = ['number', 'string', 'boolean', 'object', 'any'];
-  const ATOMS = ['true', 'false'];
-  const THIS = 'this';
+  ]);
+  const WORD_OPERATORS = wordsToRegex(['is greater than', 'is less than', 'is not', 'is']);
+
+  const BUILTINS = wordsToRegex(['print']);
+  const TYPES = wordsToRegex(['number', 'string', 'boolean', 'object', 'any']);
+  const ATOMS = wordsToRegex(['true', 'false']);
+  const THIS = wordsToRegex(['this']);
   const IDENTIFIER = /^[a-zA-Z_]\w*/;
 
   // Keywords that handle indentation
@@ -70,31 +77,23 @@ CodeMirror.defineMode('syntek', (config) => {
     }
 
     // Handle keywords
-    for (const keyword of [...KEYWORDS, ...WORD_OPERATORS]) {
-      if (stream.match(keyword)) {
-        return 'keyword';
-      }
+    if (stream.match(KEYWORDS) || stream.match(WORD_OPERATORS)) {
+      return 'keyword';
     }
 
     // Handle builtins
-    for (const builtin of BUILTINS) {
-      if (stream.match(builtin)) {
-        return 'builtin';
-      }
+    if (stream.match(BUILTINS)) {
+      return 'builtin';
     }
 
     // Handle types
-    for (const type of TYPES) {
-      if (stream.match(type)) {
-        return 'type';
-      }
+    if (stream.match(TYPES)) {
+      return 'type';
     }
 
     // Handle atoms
-    for (const atom of ATOMS) {
-      if (stream.match(atom)) {
-        return 'atom';
-      }
+    if (stream.match(ATOMS)) {
+      return 'atom';
     }
 
     // Handle this
