@@ -1,4 +1,4 @@
-/* global CodeMirror */
+import CodeMirror from 'codemirror';
 
 CodeMirror.defineMode('syntek', (config) => {
   const ERROR_CLASS = 'error';
