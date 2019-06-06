@@ -1,6 +1,6 @@
 {
-  "name": "@syntek/codemirror-mode-syntek",
-  "version": "1.0.0",
+  "name": "@syntek/codemirror-mode",
+  "version": "1.0.1",
   "description": "Codemirror mode for the Syntek language",
   "main": "syntek.js",
   "scripts": {
@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/syntek-lang/codemirror-mode-syntek.git"
+    "url": "git+https://github.com/syntek-lang/codemirror-mode.git"
   },
   "author": "SebastiaanYN",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/syntek-lang/codemirror-mode-syntek/issues"
+    "url": "https://github.com/syntek-lang/codemirror-mode/issues"
   },
-  "homepage": "https://github.com/syntek-lang/codemirror-mode-syntek#readme",
+  "homepage": "https://github.com/syntek-lang/codemirror-mode#readme",
   "dependencies": {
     "codemirror": "^5.47.0"
   },
